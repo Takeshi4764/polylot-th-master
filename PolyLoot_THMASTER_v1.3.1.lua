@@ -32,7 +32,7 @@ local CFG = {
     AttackInterval = 0.37,
     LootRadius = 55,
     PlayerHideDistance = 80,   -- distancia para ocultarse
-    HideDepth = -18,           -- qué tan bajo se esconde
+    HideDepth = -25,           -- qué tan bajo se esconde (bajo el suelo)
 }
 
 local State = {
@@ -317,19 +317,46 @@ local function getNearbyPlayer()
     return closest
 end
 
+local noclipConn = nil
+local function setNoclip(on)
+    if noclipConn then
+        pcall(function() noclipConn:Disconnect() end)
+        noclipConn = nil
+    end
+    if not on or not Character then return end
+    noclipConn = RunService.Stepped:Connect(function()
+        if not Character then return end
+        for _, part in ipairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
 local function hideUnderground()
-    if not Root then return end
+    if not Root or not Character then return end
     if not State.BodyVelocity then enableFly() end
-    -- Bajar y quedarse quieto
-    local hidePos = Vector3.new(Root.Position.X, Root.Position.Y + CFG.HideDepth, Root.Position.Z)
-    -- Si ya estamos bajos, solo quieto
-    if Root.Position.Y > (Root.Position.Y + CFG.HideDepth) + 3 then
-        State.BodyVelocity.Velocity = Vector3.new(0, -40, 0)
-    else
+
+    -- Noclip para atravesar el suelo
+    setNoclip(true)
+
+    -- Ir DEBAJO del terreno de verdad
+    local targetY = Root.Position.Y + CFG.HideDepth
+    pcall(function()
+        Character:PivotTo(CFrame.new(Root.Position.X, targetY, Root.Position.Z))
+    end)
+    if State.BodyVelocity then
         State.BodyVelocity.Velocity = Vector3.zero
     end
+
     State.IsHiding = true
-    StatusLabel.Text = "OCULTO - jugador cerca"
+    StatusLabel.Text = "OCULTO bajo tierra"
+end
+
+local function stopHiding()
+    State.IsHiding = false
+    setNoclip(false)
 end
 
 local function getClosestEnemy()
@@ -534,7 +561,7 @@ local function startLoop()
     if State.MainConn then State.MainConn:Disconnect() end
     if State.Mode == "None" then
         cleanupFly()
-        State.IsHiding = false
+        stopHiding()
         StatusLabel.Text = "Detenido"
         return
     end
@@ -554,7 +581,7 @@ local function startLoop()
                 return   -- No farmear mientras hay jugadores
             else
                 if State.IsHiding then
-                    State.IsHiding = false
+                    stopHiding()
                     StatusLabel.Text = "Jugador se fue - reanudando..."
                     if State.Style ~= "Walk" then enableFly() end
                 end
@@ -671,7 +698,7 @@ HideBtn.MouseButton1Click:Connect(function()
     HideBtn.Text = "Ocultar si hay jugadores: " .. (State.HidePlayers and "ON" or "OFF")
     HideBtn.BackgroundColor3 = State.HidePlayers and Color3.fromRGB(140, 60, 40) or Color3.fromRGB(35, 35, 45)
     if not State.HidePlayers then
-        State.IsHiding = false
+        stopHiding()
     end
 end)
 
