@@ -1,6 +1,8 @@
 -- =====================================================
--- POLY LOOT - TH MASTER
--- Mundo + Torre + Dungeon + Loot + Posiciones + Estilos
+-- POLY LOOT - TH MASTER  v1.2.0
+-- Basado en las versiones que sí funcionaban
+-- Mundo + Torre + Dungeon + Loot + Rareza + Estilo
+-- POR PARTE DE TH MASTER
 -- =====================================================
 
 local Players = game:GetService("Players")
@@ -26,18 +28,15 @@ local CFG = {
     FarmRadius = 150,
     SafeHeight = 14,
     AttackHeight = 9,
-    UnderHeight = -6,
     MoveSpeed = 36,
     AttackInterval = 0.37,
     LootRadius = 55,
 }
 
 local State = {
-    WorldOn = false,
-    TowerOn = false,
-    DungeonOn = false,
+    Mode = "None",          -- "World", "Tower", "Dungeon"
     AutoLoot = true,
-    CombatStyle = "Fly",
+    FlyMode = true,         -- true = volar, false = caminar
     MainConn = nil,
     BodyVelocity = nil,
     BodyGyro = nil,
@@ -45,13 +44,9 @@ local State = {
     lastAdvance = 0,
     noEnemySince = 0,
     crossedDoors = {},
-    SavedPositions = {},
-    FarmAllEnemies = true,   -- por defecto todos
-    AllowedEnemies = {},     -- nombres específicos si se desactiva "Todos"
 }
 
 local RarityFilter = {
-    All = true,              -- Todos los ítems (por defecto)
     Common = true,
     Rare = true,
     Epic = true,
@@ -62,55 +57,54 @@ local RarityFilter = {
 
 -- ==================== UI ====================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "THMASTER_PolyLoot"
+ScreenGui.Name = "THMASTER_v120"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = game:GetService("CoreGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 290, 0, 400)
-Main.Position = UDim2.new(0.02, 0, 0.18, 0)
-Main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+Main.Size = UDim2.new(0, 210, 0, 340)
+Main.Position = UDim2.new(0.015, 0, 0.22, 0)
+Main.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
 Main.BorderSizePixel = 0
 Main.Active = true
 Main.Draggable = true
 Main.Parent = ScreenGui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 9)
 
 local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(55, 55, 75)
-Stroke.Thickness = 1.2
+Stroke.Color = Color3.fromRGB(50, 50, 70)
+Stroke.Thickness = 1
 Stroke.Parent = Main
 
 -- Header
 local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 38)
-Header.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundColor3 = Color3.fromRGB(24, 24, 34)
 Header.BorderSizePixel = 0
 Header.Parent = Main
-Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 9)
 
 local HeaderFix = Instance.new("Frame")
-HeaderFix.Size = UDim2.new(1, 0, 0, 14)
-HeaderFix.Position = UDim2.new(0, 0, 1, -14)
-HeaderFix.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
+HeaderFix.Size = UDim2.new(1, 0, 0, 12)
+HeaderFix.Position = UDim2.new(0, 0, 1, -12)
+HeaderFix.BackgroundColor3 = Color3.fromRGB(24, 24, 34)
 HeaderFix.BorderSizePixel = 0
 HeaderFix.Parent = Header
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -70, 0, 20)
-Title.Position = UDim2.new(0, 12, 0, 3)
+Title.Size = UDim2.new(1, -40, 0, 18)
+Title.Position = UDim2.new(0, 10, 0, 4)
 Title.BackgroundTransparency = 1
-Title.Text = "POLY LOOT"
+Title.Text = "POLY LOOT  v1.2.0"
 Title.TextColor3 = Color3.fromRGB(240, 240, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 15
+Title.TextSize = 13
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Header
 
 local Credit = Instance.new("TextLabel")
-Credit.Size = UDim2.new(1, -70, 0, 14)
-Credit.Position = UDim2.new(0, 12, 0, 21)
+Credit.Size = UDim2.new(1, -40, 0, 12)
+Credit.Position = UDim2.new(0, 10, 0, 22)
 Credit.BackgroundTransparency = 1
 Credit.Text = "POR PARTE DE TH MASTER"
 Credit.TextColor3 = Color3.fromRGB(110, 130, 200)
@@ -120,356 +114,106 @@ Credit.TextXAlignment = Enum.TextXAlignment.Left
 Credit.Parent = Header
 
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 28, 0, 22)
-MinBtn.Position = UDim2.new(1, -36, 0, 8)
+MinBtn.Size = UDim2.new(0, 26, 0, 20)
+MinBtn.Position = UDim2.new(1, -32, 0, 10)
 MinBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
 MinBtn.Text = "—"
 MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 14
+MinBtn.TextSize = 13
 MinBtn.Parent = Header
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 5)
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
 
--- Tabs
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -16, 0, 28)
-TabBar.Position = UDim2.new(0, 8, 0, 44)
-TabBar.BackgroundTransparency = 1
-TabBar.Parent = Main
-
-local Tabs = {"Farm", "Loot", "Estilo", "Enemigos", "Posiciones"}
-local TabButtons = {}
-local Pages = {}
-local CurrentTab = "Farm"
-
-local function createTab(name, order)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1/#Tabs, -3, 1, 0)
-    btn.Position = UDim2.new((order-1)/#Tabs, 1, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(170, 170, 190)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 10
-    btn.Parent = TabBar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    TabButtons[name] = btn
-
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, -16, 1, -95)
-    page.Position = UDim2.new(0, 8, 0, 78)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.Visible = (name == "Farm")
-    page.Parent = Main
-    Pages[name] = page
-    return btn
-end
-
-for i, name in ipairs(Tabs) do
-    createTab(name, i)
-end
-
-local function switchTab(name)
-    CurrentTab = name
-    for n, page in pairs(Pages) do
-        page.Visible = (n == name)
-        TabButtons[n].BackgroundColor3 = (n == name) and Color3.fromRGB(65, 85, 160) or Color3.fromRGB(35, 35, 48)
-        TabButtons[n].TextColor3 = (n == name) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 170, 190)
-    end
-end
-
-for name, btn in pairs(TabButtons) do
-    btn.MouseButton1Click:Connect(function() switchTab(name) end)
-end
-switchTab("Farm")
-
--- Status
-local StatusBar = Instance.new("TextLabel")
-StatusBar.Size = UDim2.new(1, -16, 0, 18)
-StatusBar.Position = UDim2.new(0, 8, 1, -26)
-StatusBar.BackgroundTransparency = 1
-StatusBar.Text = "Listo"
-StatusBar.TextColor3 = Color3.fromRGB(130, 130, 155)
-StatusBar.Font = Enum.Font.Gotham
-StatusBar.TextSize = 11
-StatusBar.TextXAlignment = Enum.TextXAlignment.Left
-StatusBar.Parent = Main
-
--- Minimize
 local minimized = false
-local fullSize = UDim2.new(0, 290, 0, 400)
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        Main.Size = UDim2.new(0, 165, 0, 38)
+        Main.Size = UDim2.new(0, 150, 0, 40)
         MinBtn.Text = "+"
         for _, c in ipairs(Main:GetChildren()) do
             if c ~= Header and c:IsA("GuiObject") then c.Visible = false end
         end
     else
-        Main.Size = fullSize
+        Main.Size = UDim2.new(0, 210, 0, 340)
         MinBtn.Text = "—"
         for _, c in ipairs(Main:GetChildren()) do
             if c:IsA("GuiObject") then c.Visible = true end
         end
-        switchTab(CurrentTab)
     end
 end)
 
--- ========== UI HELPERS ==========
-local function makeToggle(parent, text, y, default, callback)
+-- Botones de modo
+local function createBtn(text, y)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 28)
-    btn.Position = UDim2.new(0, 0, 0, y)
-    btn.BackgroundColor3 = default and Color3.fromRGB(0, 115, 70) or Color3.fromRGB(40, 40, 52)
-    btn.Text = text .. (default and ": ON" or ": OFF")
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-
-    local on = default
-    btn.MouseButton1Click:Connect(function()
-        on = not on
-        btn.Text = text .. (on and ": ON" or ": OFF")
-        btn.BackgroundColor3 = on and Color3.fromRGB(0, 115, 70) or Color3.fromRGB(40, 40, 52)
-        callback(on, btn)
-    end)
-    return btn
-end
-
-local function makeLabel(parent, text, y)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, 0, 0, 16)
-    lbl.Position = UDim2.new(0, 0, 0, y)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(150, 150, 170)
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 11
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = parent
-    return lbl
-end
-
--- ========== PÁGINA FARM ==========
-local FarmPage = Pages["Farm"]
-makeLabel(FarmPage, "Modos de farmeo (solo uno)", 0)
-
-local function exclusiveFarm(which)
-    State.WorldOn = (which == "World")
-    State.TowerOn = (which == "Tower")
-    State.DungeonOn = (which == "Dungeon")
-    if which == "Dungeon" then State.crossedDoors = {} end
-    restartLoop()
-end
-
-makeToggle(FarmPage, "Mundo", 20, false, function(v)
-    if v then exclusiveFarm("World") else State.WorldOn = false; restartLoop() end
-end)
-makeToggle(FarmPage, "Torre", 52, false, function(v)
-    if v then exclusiveFarm("Tower") else State.TowerOn = false; restartLoop() end
-end)
-makeToggle(FarmPage, "Dungeon", 84, false, function(v)
-    if v then exclusiveFarm("Dungeon") else State.DungeonOn = false; restartLoop() end
-end)
-
--- ========== PÁGINA LOOT ==========
-local LootPage = Pages["Loot"]
-makeLabel(LootPage, "Recolección", 0)
-makeToggle(LootPage, "Auto Recoger", 18, true, function(v) State.AutoLoot = v end)
-
-makeLabel(LootPage, "Filtro de rareza", 54)
-
--- Todos los ítems (por defecto)
-local AllItemsBtn = makeToggle(LootPage, "Todos los ítems", 72, true, function(v)
-    RarityFilter.All = v
-    if v then
-        RarityFilter.Common = true
-        RarityFilter.Rare = true
-        RarityFilter.Epic = true
-        RarityFilter.Legendary = true
-        RarityFilter.Mythic = true
-        RarityFilter.Unknown = true
-    end
-end)
-
-makeToggle(LootPage, "Común", 104, true, function(v) RarityFilter.Common = v; if not v then RarityFilter.All = false end end)
-makeToggle(LootPage, "Raro", 134, true, function(v) RarityFilter.Rare = v; if not v then RarityFilter.All = false end end)
-makeToggle(LootPage, "Épico", 164, true, function(v) RarityFilter.Epic = v; if not v then RarityFilter.All = false end end)
-makeToggle(LootPage, "Legendario", 194, true, function(v) RarityFilter.Legendary = v; if not v then RarityFilter.All = false end end)
-makeToggle(LootPage, "Mítico", 224, true, function(v) RarityFilter.Mythic = v; if not v then RarityFilter.All = false end end)
-
-makeLabel(LootPage, "Si activas \"Todos\", acepta cualquier rareza nueva", 258)
-
--- ========== PÁGINA ESTILO ==========
-local StylePage = Pages["Estilo"]
-makeLabel(StylePage, "Estilo de combate", 0)
-
-local function setStyle(style, btn)
-    State.CombatStyle = style
-    for _, b in pairs(StylePage:GetChildren()) do
-        if b:IsA("TextButton") and b.Name:find("Style_") then
-            b.BackgroundColor3 = Color3.fromRGB(40, 40, 52)
-        end
-    end
-    btn.BackgroundColor3 = Color3.fromRGB(65, 95, 175)
-    StatusBar.Text = "Estilo: " .. style
-end
-
-local function makeStyleBtn(text, style, y)
-    local btn = Instance.new("TextButton")
-    btn.Name = "Style_" .. style
-    btn.Size = UDim2.new(1, 0, 0, 30)
-    btn.Position = UDim2.new(0, 0, 0, y)
-    btn.BackgroundColor3 = (State.CombatStyle == style) and Color3.fromRGB(65, 95, 175) or Color3.fromRGB(40, 40, 52)
+    btn.Size = UDim2.new(1, -16, 0, 28)
+    btn.Position = UDim2.new(0, 8, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
-    btn.Parent = StylePage
+    btn.Parent = Main
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseButton1Click:Connect(function() setStyle(style, btn) end)
+    return btn
 end
 
-makeStyleBtn("Caminar (suelo)", "Walk", 20)
-makeStyleBtn("Volar encima (recomendado)", "Fly", 54)
-makeStyleBtn("Bajo tierra (mirando arriba)", "Under", 88)
+local WorldBtn = createBtn("Mundo: OFF", 48)
+local TowerBtn = createBtn("Torre: OFF", 80)
+local DungeonBtn = createBtn("Dungeon: OFF", 112)
+local StyleBtn = createBtn("Estilo: Volar", 144)
+local LootBtn = createBtn("Auto Recoger: ON", 176)
+LootBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 170)
 
-makeLabel(StylePage, "Fly = altura segura sin recibir daño", 128)
-makeLabel(StylePage, "Under = debajo del enemigo mirando arriba", 146)
+-- Rareza
+local RarityLabel = Instance.new("TextLabel")
+RarityLabel.Size = UDim2.new(1, -16, 0, 16)
+RarityLabel.Position = UDim2.new(0, 8, 0, 212)
+RarityLabel.BackgroundTransparency = 1
+RarityLabel.Text = "Filtro Rareza"
+RarityLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
+RarityLabel.Font = Enum.Font.Gotham
+RarityLabel.TextSize = 11
+RarityLabel.TextXAlignment = Enum.TextXAlignment.Left
+RarityLabel.Parent = Main
 
--- ========== PÁGINA ENEMIGOS ==========
-local EnemyPage = Pages["Enemigos"]
-makeLabel(EnemyPage, "Filtro de enemigos", 0)
+local function createRarity(name, key, y)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.48, -6, 0, 22)
+    btn.Position = UDim2.new(0, 8, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 110, 55)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 11
+    btn.Parent = Main
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
-makeToggle(EnemyPage, "Todos los enemigos", 20, true, function(v)
-    State.FarmAllEnemies = v
-    StatusBar.Text = v and "Farmeando todos" or "Filtro activo"
-end)
-
-makeLabel(EnemyPage, "Por ahora los enemigos usan IDs (UUID).", 56)
-makeLabel(EnemyPage, "La opción \"Todos\" es la más estable.", 74)
-makeLabel(EnemyPage, "Si más adelante el juego usa nombres", 92)
-makeLabel(EnemyPage, "reales, se puede expandir esta pestaña.", 110)
-
--- ========== PÁGINA POSICIONES ==========
-local PosPage = Pages["Posiciones"]
-makeLabel(PosPage, "Guardar / Teletransportar", 0)
-
-local NameBox = Instance.new("TextBox")
-NameBox.Size = UDim2.new(1, 0, 0, 28)
-NameBox.Position = UDim2.new(0, 0, 0, 20)
-NameBox.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-NameBox.Text = ""
-NameBox.PlaceholderText = "Nombre de la posición..."
-NameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-NameBox.PlaceholderColor3 = Color3.fromRGB(110, 110, 130)
-NameBox.Font = Enum.Font.Gotham
-NameBox.TextSize = 12
-NameBox.ClearTextOnFocus = false
-NameBox.Parent = PosPage
-Instance.new("UICorner", NameBox).CornerRadius = UDim.new(0, 6)
-
-local SaveBtn = Instance.new("TextButton")
-SaveBtn.Size = UDim2.new(1, 0, 0, 28)
-SaveBtn.Position = UDim2.new(0, 0, 0, 54)
-SaveBtn.BackgroundColor3 = Color3.fromRGB(0, 105, 85)
-SaveBtn.Text = "Guardar posición actual"
-SaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SaveBtn.Font = Enum.Font.GothamBold
-SaveBtn.TextSize = 12
-SaveBtn.Parent = PosPage
-Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 6)
-
-local PosScroll = Instance.new("ScrollingFrame")
-PosScroll.Size = UDim2.new(1, 0, 1, -95)
-PosScroll.Position = UDim2.new(0, 0, 0, 90)
-PosScroll.BackgroundColor3 = Color3.fromRGB(24, 24, 34)
-PosScroll.BorderSizePixel = 0
-PosScroll.ScrollBarThickness = 3
-PosScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-PosScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-PosScroll.Parent = PosPage
-Instance.new("UICorner", PosScroll).CornerRadius = UDim.new(0, 6)
-
-local PosList = Instance.new("UIListLayout")
-PosList.Padding = UDim.new(0, 4)
-PosList.Parent = PosScroll
-
-local function refreshPosList()
-    for _, c in ipairs(PosScroll:GetChildren()) do
-        if c:IsA("Frame") then c:Destroy() end
-    end
-    for name, cf in pairs(State.SavedPositions) do
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, -6, 0, 28)
-        row.BackgroundColor3 = Color3.fromRGB(36, 36, 50)
-        row.Parent = PosScroll
-        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
-
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -70, 1, 0)
-        lbl.Position = UDim2.new(0, 8, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = name
-        lbl.TextColor3 = Color3.fromRGB(220, 220, 240)
-        lbl.Font = Enum.Font.Gotham
-        lbl.TextSize = 12
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = row
-
-        local tp = Instance.new("TextButton")
-        tp.Size = UDim2.new(0, 30, 0, 20)
-        tp.Position = UDim2.new(1, -62, 0.5, -10)
-        tp.BackgroundColor3 = Color3.fromRGB(0, 95, 170)
-        tp.Text = "TP"
-        tp.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tp.Font = Enum.Font.GothamBold
-        tp.TextSize = 11
-        tp.Parent = row
-        Instance.new("UICorner", tp).CornerRadius = UDim.new(0, 4)
-        tp.MouseButton1Click:Connect(function()
-            if Character and Root then
-                Character:PivotTo(cf)
-                StatusBar.Text = "TP → " .. name
-            end
-        end)
-
-        local del = Instance.new("TextButton")
-        del.Size = UDim2.new(0, 26, 0, 20)
-        del.Position = UDim2.new(1, -28, 0.5, -10)
-        del.BackgroundColor3 = Color3.fromRGB(130, 40, 40)
-        del.Text = "X"
-        del.TextColor3 = Color3.fromRGB(255, 255, 255)
-        del.Font = Enum.Font.GothamBold
-        del.TextSize = 11
-        del.Parent = row
-        Instance.new("UICorner", del).CornerRadius = UDim.new(0, 4)
-        del.MouseButton1Click:Connect(function()
-            State.SavedPositions[name] = nil
-            refreshPosList()
-        end)
-    end
+    btn.MouseButton1Click:Connect(function()
+        RarityFilter[key] = not RarityFilter[key]
+        btn.BackgroundColor3 = RarityFilter[key] and Color3.fromRGB(0, 110, 55) or Color3.fromRGB(70, 40, 40)
+    end)
+    return btn
 end
 
-SaveBtn.MouseButton1Click:Connect(function()
-    local name = NameBox.Text
-    if name == "" then name = "Pos_" .. tostring(math.random(100,999)) end
-    if Root then
-        State.SavedPositions[name] = Root.CFrame
-        NameBox.Text = ""
-        refreshPosList()
-        StatusBar.Text = "Guardado: " .. name
-    end
-end)
+createRarity("Común", "Common", 230)
+createRarity("Raro", "Rare", 230).Position = UDim2.new(0.52, 0, 0, 230)
+createRarity("Épico", "Epic", 256)
+createRarity("Legendario", "Legendary", 256).Position = UDim2.new(0.52, 0, 0, 256)
+createRarity("Mítico", "Mythic", 282)
 
--- ==================== LÓGICA ====================
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -16, 0, 28)
+StatusLabel.Position = UDim2.new(0, 8, 0, 308)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Listo - elige un modo"
+StatusLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 11
+StatusLabel.TextWrapped = true
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = Main
+
+-- ==================== FUNCIONES ====================
 
 local function cleanupFly()
     if State.BodyVelocity then pcall(function() State.BodyVelocity:Destroy() end) State.BodyVelocity = nil end
@@ -479,15 +223,15 @@ end
 
 local function enableFly()
     cleanupFly()
-    if not Root or State.CombatStyle == "Walk" then return end
+    if not Root then return end
     Humanoid.PlatformStand = true
     State.BodyVelocity = Instance.new("BodyVelocity")
-    State.BodyVelocity.MaxForce = Vector3.new(200000, 200000, 200000)
+    State.BodyVelocity.MaxForce = Vector3.new(180000, 180000, 180000)
     State.BodyVelocity.Velocity = Vector3.zero
     State.BodyVelocity.Parent = Root
     State.BodyGyro = Instance.new("BodyGyro")
-    State.BodyGyro.MaxTorque = Vector3.new(200000, 200000, 200000)
-    State.BodyGyro.P = 8000
+    State.BodyGyro.MaxTorque = Vector3.new(180000, 180000, 180000)
+    State.BodyGyro.P = 7000
     State.BodyGyro.Parent = Root
 end
 
@@ -501,14 +245,12 @@ local function getClosestEnemy()
     local closest, shortest = nil, CFG.FarmRadius
     for _, enemy in ipairs(agg:GetChildren()) do
         if enemy:IsA("Model") then
-            if State.FarmAllEnemies or State.AllowedEnemies[enemy.Name] then
-                local part = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Torso") or enemy.PrimaryPart or enemy:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    local dist = (Root.Position - part.Position).Magnitude
-                    if dist < shortest then
-                        shortest = dist
-                        closest = {part = part, distance = dist, name = enemy.Name}
-                    end
+            local part = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Torso") or enemy.PrimaryPart or enemy:FindFirstChildWhichIsA("BasePart")
+            if part then
+                local dist = (Root.Position - part.Position).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closest = {part = part, distance = dist}
                 end
             end
         end
@@ -516,8 +258,19 @@ local function getClosestEnemy()
     return closest
 end
 
+local function countEnemies()
+    local folder = workspace:FindFirstChild("Animal_Live")
+    if not folder then return 0 end
+    local agg = folder:FindFirstChild("Aggressors")
+    if not agg then return 0 end
+    local c = 0
+    for _, obj in ipairs(agg:GetChildren()) do
+        if obj:IsA("Model") then c += 1 end
+    end
+    return c
+end
+
 local function getRarity(drop)
-    if RarityFilter.All then return "All" end
     local r = drop:GetAttribute("Rarity") or drop:GetAttribute("rarity") or drop:GetAttribute("Tier")
     if typeof(r) == "string" then
         r = r:lower()
@@ -538,7 +291,7 @@ local function getClosestLoot()
         local prompt = drop:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
             local rarity = getRarity(drop)
-            if RarityFilter.All or RarityFilter[rarity] then
+            if RarityFilter[rarity] or RarityFilter.Unknown then
                 local parent = prompt.Parent
                 local pos
                 if parent then
@@ -586,31 +339,6 @@ local function doAttack()
     end)
 end
 
-local function moveTo(pos, lookAt)
-    if not Root then return end
-    local style = State.CombatStyle
-    if style == "Walk" then
-        cleanupFly()
-        if Humanoid then Humanoid:MoveTo(pos) end
-        if (Root.Position - pos).Magnitude > 22 then
-            Character:PivotTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
-        end
-    else
-        if not State.BodyVelocity then enableFly() end
-        local height = (style == "Under") and CFG.UnderHeight or CFG.SafeHeight
-        local goal = Vector3.new(pos.X, pos.Y + height, pos.Z)
-        local dir = goal - Root.Position
-        if dir.Magnitude > 1.5 then
-            State.BodyVelocity.Velocity = dir.Unit * CFG.MoveSpeed
-        else
-            State.BodyVelocity.Velocity = Vector3.zero
-        end
-        if State.BodyGyro and lookAt then
-            State.BodyGyro.CFrame = CFrame.lookAt(Root.Position, lookAt)
-        end
-    end
-end
-
 local function tryAdvanceTower()
     if tick() - State.lastAdvance < 2 then return end
     local keys = {"next floor", "nextfloor", "next", "siguiente", "ascend", "continue"}
@@ -622,13 +350,13 @@ local function tryAdvanceTower()
                 if text:find(k) or name:find(k) then
                     pcall(function()
                         pcall(function() firesignal(gui.MouseButton1Click) end)
-                        local p = gui.AbsolutePosition + gui.AbsoluteSize/2
+                        local p = gui.AbsolutePosition + gui.AbsoluteSize / 2
                         VirtualInputManager:SendMouseButtonEvent(p.X, p.Y, 0, true, game, 1)
                         task.wait(0.05)
                         VirtualInputManager:SendMouseButtonEvent(p.X, p.Y, 0, false, game, 1)
                     end)
                     State.lastAdvance = tick()
-                    StatusBar.Text = "Next Floor..."
+                    StatusLabel.Text = "Next Floor..."
                     return
                 end
             end
@@ -636,7 +364,7 @@ local function tryAdvanceTower()
     end
 end
 
-local function getNextDoor()
+local function getBestDoor()
     if not Root then return nil end
     local runs = workspace:FindFirstChild("DungeonRuns")
     if not runs then return nil end
@@ -649,58 +377,69 @@ local function getNextDoor()
                 local part = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
                 if part then
                     local dist = (Root.Position - part.Position).Magnitude
-                    if dist < 120 and dist > 4 then
+                    if dist < 110 and dist > 3 then
                         table.insert(candidates, {part = part, dist = dist, id = id})
                     end
                 end
             end
         end
     end
-    table.sort(candidates, function(a,b) return a.dist < b.dist end)
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
     return candidates[1]
 end
 
-local function goThroughDoor(doorData)
-    if not doorData or not Root then return end
-    local door = doorData.part
+local function goThroughDoor(data)
+    if not data or not Root or not State.BodyVelocity then return end
+    local door = data.part
     local dir = (door.Position - Root.Position)
     local flat = Vector3.new(dir.X, 0, dir.Z)
     if flat.Magnitude < 0.1 then flat = Root.CFrame.LookVector end
     flat = flat.Unit
-    local deep = door.Position + flat * 16 + Vector3.new(0, 4, 0)
+    local deep = door.Position + flat * 15 + Vector3.new(0, 4, 0)
     local dist = (Root.Position - deep).Magnitude
-    if dist > 6 then
-        moveTo(deep, door.Position)
-        StatusBar.Text = "Entrando a sala..."
+
+    if dist > 5 then
+        State.BodyVelocity.Velocity = (deep - Root.Position).Unit * (CFG.MoveSpeed + 8)
+        if State.BodyGyro then State.BodyGyro.CFrame = CFrame.lookAt(Root.Position, deep) end
+        StatusLabel.Text = "Entrando a sala..."
     else
+        State.BodyVelocity.Velocity = Vector3.zero
         pcall(function() Character:PivotTo(CFrame.new(deep)) end)
-        State.crossedDoors[doorData.id] = true
-        StatusBar.Text = "Sala nueva"
-        if State.BodyVelocity then State.BodyVelocity.Velocity = Vector3.zero end
+        State.crossedDoors[data.id] = true
+        StatusLabel.Text = "Sala nueva"
     end
 end
 
-function restartLoop()
+-- ========== LOOP ==========
+local function startLoop()
     if State.MainConn then State.MainConn:Disconnect() end
-    if not (State.WorldOn or State.TowerOn or State.DungeonOn) then
+    if State.Mode == "None" then
         cleanupFly()
-        StatusBar.Text = "Detenido"
+        StatusLabel.Text = "Detenido"
         return
     end
-    if State.CombatStyle ~= "Walk" then enableFly() end
+
+    if State.FlyMode then enableFly() end
     State.noEnemySince = tick()
+    if State.Mode == "Dungeon" then State.crossedDoors = {} end
 
     State.MainConn = RunService.Heartbeat:Connect(function()
         if not Root or not Humanoid or Humanoid.Health <= 0 then return end
-        if not (State.WorldOn or State.TowerOn or State.DungeonOn) then return end
+        if State.Mode == "None" then return end
+        if State.FlyMode and not State.BodyVelocity then enableFly() end
 
         -- PRIORIDAD 1: LOOT
         if State.AutoLoot then
             local loot = getClosestLoot()
             if loot then
-                StatusBar.Text = "Recogiendo item..."
+                StatusLabel.Text = "Recogiendo item..."
                 if loot.dist > 7 then
-                    moveTo(loot.pos + Vector3.new(0, 3, 0), loot.pos)
+                    if State.FlyMode and State.BodyVelocity then
+                        State.BodyVelocity.Velocity = ((loot.pos + Vector3.new(0, 5, 0)) - Root.Position).Unit * 32
+                        if State.BodyGyro then State.BodyGyro.CFrame = CFrame.lookAt(Root.Position, loot.pos) end
+                    else
+                        Humanoid:MoveTo(loot.pos)
+                    end
                 else
                     if State.BodyVelocity then State.BodyVelocity.Velocity = Vector3.zero end
                     if fireproximityprompt then pcall(fireproximityprompt, loot.prompt) end
@@ -711,43 +450,92 @@ function restartLoop()
 
         -- PRIORIDAD 2: COMBATE
         local enemy = getClosestEnemy()
-        if enemy then
+        local enemyCount = countEnemies()
+
+        if enemy and enemyCount > 0 then
             State.noEnemySince = tick()
             local pos = enemy.part.Position
             local horizontal = Vector3.new(Root.Position.X - pos.X, 0, Root.Position.Z - pos.Z).Magnitude
 
-            if State.CombatStyle == "Fly" then
+            if State.FlyMode then
                 local h = (horizontal < 8) and CFG.AttackHeight or CFG.SafeHeight
-                moveTo(Vector3.new(pos.X, pos.Y + h, pos.Z), pos)
-            elseif State.CombatStyle == "Under" then
-                moveTo(Vector3.new(pos.X, pos.Y + CFG.UnderHeight, pos.Z), pos)
+                local goal = Vector3.new(pos.X, pos.Y + h, pos.Z)
+                local dir = goal - Root.Position
+                if dir.Magnitude > 1.5 then
+                    State.BodyVelocity.Velocity = dir.Unit * CFG.MoveSpeed
+                else
+                    State.BodyVelocity.Velocity = Vector3.zero
+                end
+                if State.BodyGyro then State.BodyGyro.CFrame = CFrame.lookAt(Root.Position, pos) end
             else
-                moveTo(pos, pos)
+                cleanupFly()
+                if horizontal > 6 then
+                    Humanoid:MoveTo(pos)
+                else
+                    Humanoid:MoveTo(Root.Position)
+                end
             end
 
             if horizontal < 13 then
                 doAttack()
-                StatusBar.Text = "Atacando"
+                StatusLabel.Text = "Atacando (" .. enemyCount .. ")"
             else
-                StatusBar.Text = "Yendo al enemigo"
+                StatusLabel.Text = "Yendo (" .. enemyCount .. ")"
             end
         else
             if State.BodyVelocity then State.BodyVelocity.Velocity = Vector3.zero end
             local t = tick() - State.noEnemySince
 
-            if State.TowerOn and t > 1.0 then
+            if State.Mode == "Tower" and t > 1.0 then
                 tryAdvanceTower()
-                StatusBar.Text = "Buscando Next Floor..."
-            elseif State.DungeonOn and t > 0.8 then
-                local door = getNextDoor()
-                if door then goThroughDoor(door)
-                else StatusBar.Text = "Esperando puerta..." end
-            elseif State.WorldOn then
-                StatusBar.Text = "Buscando enemigos..."
+                StatusLabel.Text = "Buscando Next Floor..."
+            elseif State.Mode == "Dungeon" and t > 0.8 then
+                local door = getBestDoor()
+                if door then
+                    goThroughDoor(door)
+                else
+                    StatusLabel.Text = "Esperando puerta..."
+                end
+            else
+                StatusLabel.Text = "Buscando enemigos..."
             end
         end
     end)
 end
 
-print("✅ POLY LOOT - POR PARTE DE TH MASTER")
-print("Pestañas: Farm | Loot | Estilo | Enemigos | Posiciones")
+local function setMode(mode)
+    State.Mode = mode
+    WorldBtn.Text = "Mundo: " .. (mode == "World" and "ON" or "OFF")
+    WorldBtn.BackgroundColor3 = mode == "World" and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(35, 35, 45)
+    TowerBtn.Text = "Torre: " .. (mode == "Tower" and "ON" or "OFF")
+    TowerBtn.BackgroundColor3 = mode == "Tower" and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(35, 35, 45)
+    DungeonBtn.Text = "Dungeon: " .. (mode == "Dungeon" and "ON" or "OFF")
+    DungeonBtn.BackgroundColor3 = mode == "Dungeon" and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(35, 35, 45)
+    startLoop()
+end
+
+WorldBtn.MouseButton1Click:Connect(function()
+    setMode(State.Mode == "World" and "None" or "World")
+end)
+TowerBtn.MouseButton1Click:Connect(function()
+    setMode(State.Mode == "Tower" and "None" or "Tower")
+end)
+DungeonBtn.MouseButton1Click:Connect(function()
+    setMode(State.Mode == "Dungeon" and "None" or "Dungeon")
+end)
+
+StyleBtn.MouseButton1Click:Connect(function()
+    State.FlyMode = not State.FlyMode
+    StyleBtn.Text = "Estilo: " .. (State.FlyMode and "Volar" or "Caminar")
+    StyleBtn.BackgroundColor3 = State.FlyMode and Color3.fromRGB(0, 90, 160) or Color3.fromRGB(35, 35, 45)
+    if State.Mode ~= "None" then startLoop() end
+end)
+
+LootBtn.MouseButton1Click:Connect(function()
+    State.AutoLoot = not State.AutoLoot
+    LootBtn.Text = "Auto Recoger: " .. (State.AutoLoot and "ON" or "OFF")
+    LootBtn.BackgroundColor3 = State.AutoLoot and Color3.fromRGB(0, 100, 170) or Color3.fromRGB(35, 35, 45)
+end)
+
+print("✅ POLY LOOT v1.2.0 - POR PARTE DE TH MASTER47")
+print("Versión estable basada en scripts que funcionaban")
